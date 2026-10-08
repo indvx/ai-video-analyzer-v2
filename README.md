@@ -30,6 +30,9 @@ This project combines:
 ├── README.md                  # Project documentation
 ├── alembic.ini                # Alembic migration configuration
 ├── alembic/                   # Database migration scripts
+│   ├── versions/              # Auto-generated versioned migrations
+│   ├── env.py                 # Alembic runtime configuration
+│   └── script.py.mako         # Migration script template
 ├── app/
 │   ├── api/
 │   │   ├── chat.py            # Chat Q&A endpoints
@@ -74,6 +77,7 @@ This project combines:
 - LangChain
 - OpenAI / Google Gemini
 - MoviePy
+- Alembic (for database migrations)
 
 ## Environment Configuration
 
@@ -123,6 +127,101 @@ python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+## Database Setup & Migrations with Alembic
+
+### What is Alembic?
+
+Alembic is a lightweight SQL database migration tool for SQLAlchemy. It allows you to:
+- Automate schema changes (create tables, add columns, modify constraints, etc.)
+- Track database version history
+- Easily upgrade and downgrade between schema versions
+- Collaborate on database changes without manual SQL
+
+### Initial Database Setup
+
+Before running migrations, ensure your MySQL database exists:
+
+```bash
+mysql -u root -p
+```
+
+```sql
+CREATE DATABASE ai;
+EXIT;
+```
+
+### Running Migrations
+
+The first time you set up the project, apply all migrations to create the initial schema:
+
+```bash
+alembic upgrade head
+```
+
+This creates all necessary tables (e.g., the `videos` table) to match your SQLAlchemy models.
+
+### Checking Migration Status
+
+To see which migrations have been applied:
+
+```bash
+alembic current
+```
+
+To view the migration history:
+
+```bash
+alembic history
+```
+
+### Creating a New Migration
+
+When you add or modify a SQLAlchemy model in `app/sql/model/`, generate a migration:
+
+```bash
+alembic revision --autogenerate -m "Description of changes"
+```
+
+This creates a new versioned migration file in `alembic/versions/` that Alembic will track.
+
+Example:
+
+```bash
+alembic revision --autogenerate -m "Add suitability column to videos table"
+```
+
+### Applying Migrations
+
+After creating a migration, apply it to the database:
+
+```bash
+alembic upgrade head
+```
+
+### Rolling Back Migrations
+
+If you need to undo the most recent migration:
+
+```bash
+alembic downgrade -1
+```
+
+To downgrade to a specific revision:
+
+```bash
+alembic downgrade <revision_id>
+```
+
+### Migration Files
+
+All migration scripts are stored in `alembic/versions/` with names like:
+```
+001_initial_schema.py
+002_add_suitability_column.py
+```
+
+Each file contains `upgrade()` and `downgrade()` functions that define how to apply and undo the changes.
 
 ## Running the App
 
@@ -219,23 +318,32 @@ curl -X POST "http://localhost:8000/api/chat/ask" \
 4. When a user asks a question, the related summary chunks are retrieved and sent back to the model with chat context.
 5. The answer is returned through the chat API.
 
-## Database Notes
+## Database Schema
 
-The project uses SQLAlchemy models under `app/sql/model` and CRUD helpers under `app/sql/crud` to manage video metadata. The model includes:
+The project uses SQLAlchemy models under `app/sql/model` and CRUD helpers under `app/sql/crud` to manage video metadata.
 
-- `id`
-- `video_name`
-- `category`
-- `suitability`
-- `video_type`
-- `created_at`
-- `updated_at`
+### Video Table
+
+The `videos` table stores uploaded video metadata:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | INT | Primary key, auto-increment |
+| `video_name` | VARCHAR(255) | Unique identifier for the video file |
+| `category` | VARCHAR(255) | Optional content category (e.g., "movie", "tutorial") |
+| `suitability` | VARCHAR(255) | Optional age/audience rating (e.g., "PG-13") |
+| `video_type` | VARCHAR(255) | File format (e.g., "mp4") |
+| `created_at` | DATETIME | Timestamp when the video was uploaded |
+| `updated_at` | DATETIME | Timestamp of last modification |
+
+Migrations for this table are managed through Alembic. To view or modify the schema, update the model in `app/sql/model/video.py` and create a new migration.
 
 ## Notes
 
 - This repository is designed as a backend service and expects a frontend client or API consumer to upload and interact with videos.
 - Some configuration values are intentionally set via `.env` rather than hardcoded in the source tree.
-- The project includes Alembic configuration for future schema migrations.
+- Database schema changes are managed through Alembic migrations. Always use `alembic revision --autogenerate` when modifying SQLAlchemy models.
+- The project uses a scoped session for thread-safe database access across concurrent requests.
 
 ## License
 
@@ -244,4 +352,3 @@ This project does not appear to include a license file in the current repository
 ## Contributing
 
 Feel free to fork the repository and submit pull requests with improvements, bug fixes, or new AI analysis features.
-
