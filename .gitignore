@@ -1,0 +1,8 @@
+.env
+venv
+videos/*
+**/__pycache__
+database/vector_db/*
+celerybeat-schedule
+logs/*
+Dockerfile
