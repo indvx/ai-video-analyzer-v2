@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     google_api_key: str
     openai_api_key: str
 
+    # Vector DB Config
+    vector_db_dir_name: str
+    vector_db_collection_name: str
+
     # Database Config
     database_connection: str
     database_host: str
