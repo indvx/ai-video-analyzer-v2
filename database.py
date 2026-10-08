@@ -30,7 +30,6 @@ def get_db():
     """Yield a database session context."""
     db = SessionLocal()
     try:
-        return db
+        yield db
     finally:
         db.close()
-        engine.dispose()

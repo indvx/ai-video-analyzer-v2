@@ -11,11 +11,11 @@ from langchain_core.messages import HumanMessage, AIMessage, AnyMessage
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_classic.chains.retrieval import create_retrieval_chain
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from services.vector_store import VectorStoreService
-from services.llm import LLMService
+from app.services.ai_service.vector_store import VectorStoreService
+from app.services.ai_service.llm import LLMService
 from uuid import uuid4
 from logger_app import setup_logger
-from core.config import settings
+from app.core.config import settings
 
 # Persistent in-memory checkpointer for thread memory across invocations
 MEMORY_SAVER = MemorySaver()

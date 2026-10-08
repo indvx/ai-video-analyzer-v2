@@ -1,6 +1,6 @@
 from langchain_chroma import Chroma
-from services.llm import LLMService
-from core.config import settings
+from app.services.ai_service.llm import LLMService
+from app.core.config import settings
 import os
 
 

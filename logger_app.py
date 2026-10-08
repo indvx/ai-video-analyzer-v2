@@ -2,20 +2,12 @@ import logging
 from app.core.config import settings
 import os
 
-# ------------------------------------------------------------
-# Method: setup_logger
-# Description:
-#   Configures and returns a logger that outputs debug-level
-#   logs to the console with timestamps, logger names, and
-#   log levels included in the format.
-#   Logs every action for audit and debugging purposes.
-# ------------------------------------------------------------
-
-os.makedirs(settings.log_file_path, exist_ok=True)
-LOG_FILE = os.path.join(settings.log_file_path, "app.log")
+os.makedirs(settings.log_file_dir, exist_ok=True)
+LOG_FILE = os.path.join(settings.log_file_dir, "app.log")
 
 
 def setup_logger(file: str = __name__):
+    """Setup logger with console and file handlers."""
     logger = logging.getLogger(file)
     logger.setLevel(logging.DEBUG)
 
