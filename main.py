@@ -8,6 +8,7 @@ from app.core.config import settings
 os.makedirs(settings.video_org_dir, exist_ok=True)
 os.makedirs(settings.video_temp_dir, exist_ok=True)
 os.makedirs(settings.log_file_dir, exist_ok=True)
+os.makedirs(settings.vector_db_dir_name, exist_ok=True)
 
 app = FastAPI(
     title="Video Analyzer with AI API",

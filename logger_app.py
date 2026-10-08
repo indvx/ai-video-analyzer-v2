@@ -2,7 +2,6 @@ import logging
 from app.core.config import settings
 import os
 
-os.makedirs(settings.log_file_dir, exist_ok=True)
 LOG_FILE = os.path.join(settings.log_file_dir, "app.log")
 
 

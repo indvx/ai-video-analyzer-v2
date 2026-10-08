@@ -11,7 +11,6 @@ class VectorStoreService:
         self.__embedding = LLMService().get_embedding_model()
         self.__persist_directory = settings.vector_db_dir_name
         self.__collection_name = settings.vector_db_collection_name
-        os.makedirs(self.__persist_directory, exist_ok=True)
 
     def vector_db(self):
         """Get the Chroma vector store instance."""
