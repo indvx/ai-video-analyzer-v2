@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # Directories Config
     video_temp_dir: str
     video_org_dir: str
-    log_file_path: str
+    log_file_dir: str
 
     model_config = SettingsConfigDict(
         env_file=".env",
