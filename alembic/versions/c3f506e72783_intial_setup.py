@@ -1,10 +1,4 @@
-"""intial setup
-
-Revision ID: c3f506e72783
-Revises: 
-Create Date: 2026-10-08 08:33:06.192082
-
-"""
+"""intial setup Revision ID: c3f506e72783 Revises: Create Date: 2026-10-08 08:33:06.192082"""
 from typing import Sequence, Union
 
 from alembic import op

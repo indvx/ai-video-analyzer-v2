@@ -17,7 +17,7 @@ from uuid import uuid4
 from logger_app import setup_logger
 from app.core.config import settings
 
-# Persistent in-memory checkpointer for thread memory across invocations
+# Keep chat history between runs that share the same thread ID.
 MEMORY_SAVER = MemorySaver()
 
 
@@ -131,6 +131,7 @@ class LanggraphService:
         messages = state.get("messages", [])
 
         vector_db = self.__vector_service.vector_db()
+        # Keep retrieval scoped to this video so unrelated summaries aren't mixed in.
         search_kwargs = {"filter": {"source": video_name}}
         retriever = vector_db.as_retriever(search_kwargs=search_kwargs)
 
@@ -174,14 +175,11 @@ class LanggraphService:
             return self.__graph
 
         pipeline = StateGraph(MainState)
-        checkpointer = MEMORY_SAVER
-        # Add nodes
         pipeline.add_node("upload_video", self.upload_video)
         pipeline.add_node("summarize_video", self.summarize_video)
         pipeline.add_node("store_summary_in_db", self.store_summary_in_db)
         pipeline.add_node("ask_question", self.ask_question)
 
-        # Conditional edges
         pipeline.add_conditional_edges(
             START,
             self.conditional_node,
@@ -191,11 +189,10 @@ class LanggraphService:
             },
         )
 
-        # Sequential edges
         pipeline.add_edge("upload_video", "summarize_video")
         pipeline.add_edge("summarize_video", "store_summary_in_db")
         pipeline.add_edge("store_summary_in_db", END)
         pipeline.add_edge("ask_question", END)
 
-        self.__graph = pipeline.compile(checkpointer=checkpointer)
+        self.__graph = pipeline.compile(checkpointer=MEMORY_SAVER)
         return self.__graph

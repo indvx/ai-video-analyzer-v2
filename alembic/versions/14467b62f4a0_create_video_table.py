@@ -1,10 +1,4 @@
-"""create video table
-
-Revision ID: 14467b62f4a0
-Revises: c3f506e72783
-Create Date: 2026-10-08 08:33:52.300939
-
-"""
+"""create video table Revision ID: 14467b62f4a0 Revises: c3f506e72783 Create Date: 2026-10-08 08:33:52.300939"""
 from typing import Sequence, Union
 
 from alembic import op
