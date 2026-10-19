@@ -2,17 +2,23 @@ import logging
 from app.core.config import settings
 import os
 
+# Centralized log file path where all application events and errors get appended
 LOG_FILE = os.path.join(settings.log_file_dir, "app.log")
 
 
 def setup_logger(file: str = __name__):
-    """Setup logger with console and file handlers."""
+    """Sets up a logger instance that outputs to both console (stdout) and a persistent log file.
+    
+    Accepts the module `__name__` so log entries clearly show where the message originated.
+    """
     logger = logging.getLogger(file)
     logger.setLevel(logging.DEBUG)
 
-    # Create console handler and set level to debug
+    # StreamHandler allows real-time terminal monitoring during development and container runs
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
+    
+    # Configure root logger to write utf-8 encoded files (safely handles unicode video titles and prompts)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
@@ -22,12 +28,10 @@ def setup_logger(file: str = __name__):
         ],
     )
 
-    # Create formatter
+    # Apply standard timestamped format for individual module loggers
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
-    # Add formatter to ch
     ch.setFormatter(formatter)
-    # Add ch to logger
     logger.addHandler(ch)
     return logger

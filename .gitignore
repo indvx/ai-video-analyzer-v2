@@ -6,3 +6,4 @@ database/vector_db/*
 celerybeat-schedule
 logs/*
 Dockerfile
+vector_db/*
