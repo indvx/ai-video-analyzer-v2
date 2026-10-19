@@ -4,12 +4,18 @@ from app.core.config import settings
 
 
 class LLMService:
-    """Provides LLM chat and embedding model instances based on the configured provider (OpenAI or Google Gemini)."""
+    """Factory service that instantiates LLM chat models and embedding functions.
+    
+    Supports switching between Google Gemini and OpenAI simply by updating the 
+    `LLM_PROVIDER` environment variable, avoiding provider vendor-lock across the app.
+    """
 
     def __init__(self):
+        # Resolve active provider and model identities from environment settings
         self.__provider = str(settings.llm_provider)
         self.__chat_model = str(settings.llm_model_name)
         self.__embedding_model = str(settings.llm_embedding_model)
+        # Pick matching API key based on the chosen provider
         self.__api_key = (
             str(settings.openai_api_key)
             if self.__provider == "openai"
@@ -17,7 +23,10 @@ class LLMService:
         )
 
     def gemini_chat_model(self):
-        """Initialize and return the Google Gemini chat model."""
+        """Builds Google Gemini chat client.
+        
+        Temperature is set to 0 for deterministic, factual summaries and RAG answers.
+        """
         return ChatGoogleGenerativeAI(
             model=self.__chat_model,
             temperature=0,
@@ -27,13 +36,13 @@ class LLMService:
         )
 
     def gemini_embedding_model(self):
-        """Initialize and return Google Gemini embeddings."""
+        """Builds Google Gemini embeddings client for vectorizing summaries and search queries."""
         return GoogleGenerativeAIEmbeddings(
             model=self.__embedding_model, api_key=self.__api_key
         )
 
     def openai_chat_model(self):
-        """Initialize and return the OpenAI GPT chat model."""
+        """Builds OpenAI GPT chat client with deterministic zero-temperature settings."""
         return ChatOpenAI(
             model=self.__chat_model,
             temperature=0,
@@ -42,17 +51,17 @@ class LLMService:
         )
 
     def openai_embedding_model(self):
-        """Initialize and return OpenAI embeddings."""
+        """Builds OpenAI embeddings client for text vectorization."""
         return OpenAIEmbeddings(model=self.__embedding_model, api_key=self.__api_key)
 
     def get_chat_model(self):
-        """Return the active chat model instance based on configuration."""
+        """Returns the active chat model based on the configured `LLM_PROVIDER`."""
         if self.__provider == "openai":
             return self.openai_chat_model()
         return self.gemini_chat_model()
 
     def get_embedding_model(self):
-        """Return the active embedding model instance based on configuration."""
+        """Returns the active embedding model based on the configured `LLM_PROVIDER`."""
         if self.__provider == "openai":
             return self.openai_embedding_model()
         return self.gemini_embedding_model()

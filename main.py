@@ -4,7 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import video, chat
 from app.core.config import settings
 
-# Create required storage & log directories on startup
+# Ensure required storage directories exist before handling any requests.
+# This prevents runtime FileNotFoundError when saving uploads, writing subclips,
+# persisting Chroma embeddings, or writing logs.
 os.makedirs(settings.video_org_dir, exist_ok=True)
 os.makedirs(settings.video_temp_dir, exist_ok=True)
 os.makedirs(settings.log_file_dir, exist_ok=True)
@@ -16,7 +18,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS Middleware setup
+# Allow all origins during development and cross-domain access from frontend UI
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -25,13 +27,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Routers
+# Register feature routers: video asset management and RAG-based chat Q&A
 app.include_router(video.router)
 app.include_router(chat.router)
 
 
 @app.get("/", tags=["Health Check"])
 def read_root():
+    """Simple ping endpoint for uptime monitoring and container readiness probes."""
     return {
         "status": "healthy",
         "service": "Video Analyzer with AI API",

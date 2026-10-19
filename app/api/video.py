@@ -27,6 +27,7 @@ from app.core.config import settings
 
 logger = setup_logger(__name__)
 
+# Router for video asset management (upload, streaming, listing, and AI summarization)
 router = APIRouter(
     prefix="/api/video",
     tags=["Video"],
@@ -44,7 +45,9 @@ async def upload_video(
     generate_initial_summary: Optional[bool] = Form(False),
     db: Session = Depends(get_db),
 ):
-    """Upload a new video file, register in DB, calculate duration, and optionally generate initial summary."""
+    """Uploads a video file, registers it in the database, extracts playback duration, 
+    and optionally generates and indexes an initial AI summary.
+    """
     try:
         os.makedirs(settings.video_org_dir, exist_ok=True)
         video_name = file.filename
@@ -53,19 +56,22 @@ async def upload_video(
 
         save_path = os.path.join(settings.video_org_dir, video_name)
         
-        # Save file to ORG_DIR
+        # Save uploaded binary chunks directly to the persistent video folder
         with open(save_path, "wb") as f:
             f.write(await file.read())
 
+        # Avoid creating duplicate DB rows if the user re-uploads an existing video file
         is_new_video = False
         existing_video = get_video_by_name(db, video_name)
         if not existing_video:
             existing_video = create_video(db, video_name, video_type)
             is_new_video = True
 
+        # Read actual playback duration directly from the saved file headers
         duration = utility_service.get_video_duration(save_path)
         formatted_duration = utility_service.format_time(duration)
 
+        # If requested, run summarization immediately and push chunks to Chroma if it's new
         summary = None
         if generate_initial_summary:
             summary = utility_service.generate_summary(
@@ -98,11 +104,12 @@ async def get_videos(
     filter: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    """Get list of uploaded videos with search filtering and pagination."""
+    """Retrieves paginated list of videos, enriching each record with live duration data from disk."""
     try:
         data = get_video_list(db, filter=filter, limit=limit, page=page)
         enhanced_videos = []
         for v in data["videos"]:
+            # Inspect the file on disk to populate dynamic duration fields for UI cards
             file_path = os.path.join(settings.video_org_dir, v.video_name)
             duration = utility_service.get_video_duration(file_path)
             enhanced_videos.append(
@@ -131,7 +138,7 @@ async def get_videos(
 
 @router.get("/get/{video_id}", response_model=VideoBase)
 async def get_video(video_id: int, db: Session = Depends(get_db)):
-    """Get video details by ID."""
+    """Fetches details for a single video by database ID."""
     video = get_video_by_id(db, video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
@@ -153,7 +160,7 @@ async def get_video(video_id: int, db: Session = Depends(get_db)):
 
 @router.get("/stream/{video_name}")
 async def stream_video(video_name: str):
-    """Stream video file for playback in frontend video player."""
+    """Serves the MP4 video file from disk for direct playback in HTML5 video elements."""
     file_path = os.path.join(settings.video_org_dir, video_name)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Video file not found on disk")
@@ -162,7 +169,7 @@ async def stream_video(video_name: str):
 
 @router.post("/summary", response_model=SummaryResponse)
 async def generate_video_summary(req: SummaryRequest, db: Session = Depends(get_db)):
-    """Generate full AI summary for an existing video file."""
+    """Generates an AI summary for an existing video file, optionally using custom instructions."""
     try:
         video_path = os.path.join(settings.video_org_dir, req.video_name)
         if not os.path.exists(video_path):
@@ -182,14 +189,14 @@ async def generate_video_summary(req: SummaryRequest, db: Session = Depends(get_
 
 @router.post("/custom-prompt", response_model=dict)
 async def build_custom_prompt(req: CustomPromptRequest):
-    """Generate custom summary prompt string based on user options."""
+    """Utility endpoint that compiles UI form selections into a prompt string for review before submission."""
     prompt = utility_service.build_custom_prompt(req)
     return {"prompt": prompt}
 
 
 @router.post("/range-summary", response_model=SummaryResponse)
 async def generate_range_summary(req: TimeRangeSummaryRequest):
-    """Generate summary for a specific time range segment of a video."""
+    """Cuts a video segment between start and end seconds and generates a focused summary."""
     try:
         video_path = os.path.join(settings.video_org_dir, req.video_name)
         if not os.path.exists(video_path):
@@ -210,7 +217,7 @@ async def generate_range_summary(req: TimeRangeSummaryRequest):
 
 @router.delete("/{video_id}", response_model=dict)
 async def delete_video(video_id: int, db: Session = Depends(get_db)):
-    """Delete video from DB, remove stored vector embeddings, and delete file from disk."""
+    """Deletes a video record and cleans up all associated storage across the system."""
     video = get_video_by_id(db, video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
@@ -218,13 +225,13 @@ async def delete_video(video_id: int, db: Session = Depends(get_db)):
     video_name = video.video_name
     file_path = os.path.join(settings.video_org_dir, video_name)
 
-    # Remove vector embeddings
+    # 1. Clear embeddings first so dead video records don't linger in vector search
     vector_store_service._delete_documents(video_name)
 
-    # Delete record from database
+    # 2. Remove the database record
     delete_video_by_id(db, video_id)
 
-    # Remove file from disk
+    # 3. Wipe the actual MP4 file off disk to free up space
     if os.path.exists(file_path):
         os.remove(file_path)
 

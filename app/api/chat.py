@@ -7,6 +7,7 @@ from app.core.config import settings
 
 logger = setup_logger(__name__)
 
+# Router for conversational AI chat and video Q&A endpoints
 router = APIRouter(
     prefix="/api/chat",
     tags=["Chat"],
@@ -18,12 +19,19 @@ utility_service = UtilityService()
 
 @router.post("/ask", response_model=QuestionResponse)
 async def ask_question(req: QuestionRequest):
-    """Answer questions about video content using Chroma vector RAG retrieval."""
+    """Answers user questions about a specific video using semantic RAG retrieval.
+    
+    Combines ChromaDB vector search with LangGraph conversational memory to support
+    multi-turn Q&A across the video's content and transcripts.
+    """
     try:
+        # Validate that the query is not whitespace-only
         if not req.question or not req.question.strip():
             raise HTTPException(status_code=400, detail="Question cannot be empty")
 
         video_path = os.path.join(settings.video_org_dir, req.video_name)
+        
+        # If the frontend didn't supply an ongoing chat thread ID, use video_name as the default bucket
         thread_id = req.thread_id or req.video_name
 
         answer = utility_service.generate_answer(

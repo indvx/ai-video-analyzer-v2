@@ -11,26 +11,31 @@ logger = setup_logger(__name__)
 
 
 class UtilityService:
-    """Helper service for video duration formatting, prompt generation, subclipping, and AI workflow integration."""
+    """Helper service bridging video media manipulations (MoviePy) with the LangGraph AI workflows."""
 
     def __init__(self):
+        # Initialize and compile the LangGraph workflow pipeline once on startup
         self.langgraph_service = LanggraphService()
         self.graph = self.langgraph_service.build_pipeline()
 
     @staticmethod
     def format_time(seconds: int) -> str:
-        """Format total seconds into mm:ss."""
+        """Formats an integer seconds count into human-friendly mm:ss string (e.g. 125 -> '2:05')."""
         m = int(seconds) // 60
         s = int(seconds) % 60
         return f"{m}:{s:02d}"
 
     @staticmethod
     def get_video_duration(video_path: str) -> int:
-        """Get video duration in seconds using MoviePy."""
+        """Reads video duration in seconds via MoviePy.
+        
+        Always explicitly closes the clip reader to prevent open file descriptor leaks.
+        """
         try:
             if os.path.exists(video_path):
                 clip = VideoFileClip(video_path)
                 duration = int(clip.duration)
+                # Important: release the file lock immediately after reading header metadata
                 clip.close()
                 return duration
         except Exception as e:
@@ -39,7 +44,7 @@ class UtilityService:
 
     @staticmethod
     def build_custom_prompt(req: CustomPromptRequest) -> str:
-        """Build dynamic prompt string based on prompt options."""
+        """Translates user preferences from the frontend UI into a structured instruction for the LLM."""
         prompt_parts = []
 
         if req.summary_type:
@@ -51,6 +56,7 @@ class UtilityService:
         if req.summary_language:
             prompt_parts.append(f"Write the summary in {req.summary_language} language.")
 
+        # Age-appropriate content evaluation instructions
         if req.age is not None:
             if req.age <= 18:
                 prompt_parts.append(
@@ -66,6 +72,7 @@ class UtilityService:
                 "Present the summary in well-structured bullet points, covering aspects such as video language, category (movie, song, cartoon), and tone."
             )
 
+        # Content moderation checks
         if req.detect_harmful_words:
             prompt_parts.append(
                 "Identify and highlight any harmful, offensive, or inappropriate words in the transcript."
@@ -81,7 +88,10 @@ class UtilityService:
     def generate_summary(
         self, video_path: str, video_name: str, is_new_video: bool = False, prompt: str = ""
     ) -> str:
-        """Generate AI-based summary for a video."""
+        """Executes the summarization pipeline on a video file.
+        
+        Passes `thread_id=video_name` so any follow-up questions can reference this video's conversation state.
+        """
         thread_id = video_name
         config = {"configurable": {"thread_id": thread_id}}
         inputs = {
@@ -96,15 +106,19 @@ class UtilityService:
     def generate_range_summary(
         self, video_path: str, video_name: str, start_time: int, end_time: int, prompt: str = ""
     ) -> str:
-        """Generate AI summary for a specific time range segment of a video."""
+        """Cuts a video clip between `start_time` and `end_time` (seconds) and runs it through the AI summarizer."""
         os.makedirs(settings.video_temp_dir, exist_ok=True)
+        
+        # Render the subclip to a temporary file so the multimodal LLM can consume it directly
         clip = VideoFileClip(video_path).subclipped(start_time, end_time)
         new_file = f"{int(time.time())}_{uuid.uuid4().hex}.mp4"
         temp_path = os.path.join(settings.video_temp_dir, new_file)
         clip.write_videofile(temp_path, codec="libx264", audio_codec="aac", logger=None)
-        clip.close()
+        clip.close()  # Release file lock before passing to LLM
 
+        # Always clean up the temp file even if LLM inference times out or throws an error
         try:
+            # `is_new_video=False` ensures subclip summaries are not pushed to Chroma (avoids polluting main video RAG)
             summary = self.generate_summary(temp_path, video_name, is_new_video=False, prompt=prompt)
         finally:
             if os.path.exists(temp_path):
@@ -115,7 +129,11 @@ class UtilityService:
     def generate_answer(
         self, video_path: str, video_name: str, question: str, thread_id: str = None
     ) -> str:
-        """Answer user questions about the video content via RAG workflow."""
+        """Executes the RAG pipeline to answer questions about a video.
+        
+        Uses the `thread_id` to maintain multi-turn chat memory in LangGraph.
+        """
+        # If no explicit chat session ID is passed, group conversation history by video filename
         if not thread_id:
             thread_id = video_name
         config = {"configurable": {"thread_id": thread_id}}
